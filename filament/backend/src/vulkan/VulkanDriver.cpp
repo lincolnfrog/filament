@@ -729,7 +729,7 @@ bool VulkanDriver::isRenderTargetFormatSupported(TextureFormat format) {
 }
 
 bool VulkanDriver::isFrameBufferFetchSupported() {
-    return false;
+    return true;
 }
 
 bool VulkanDriver::isFrameTimeSupported() {
