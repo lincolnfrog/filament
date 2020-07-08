@@ -694,11 +694,21 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
 
                 out.params.clearColor = data.clearColor;
 
+                if (colorGradingConfig.asSubpass) {
+                    ppm.colorGradingPrepare(driver,
+                            view.getColorGrading(),
+                            view.getVignetteOptions(),
+                            colorGradingConfig.translucent,
+                            colorGradingConfig.fxaa,
+                            colorGradingConfig.dithering,
+                            out.params.viewport.width,
+                            out.params.viewport.height);
+                }
+
                 driver.beginRenderPass(out.target, out.params);
                 pass.executeCommands(resources.getPassName());
 
                 if (colorGradingConfig.asSubpass) {
-                    // post-processing....
                     ppm.colorGradingSubpass(driver,
                             view.getColorGrading(),
                             view.getVignetteOptions(),
