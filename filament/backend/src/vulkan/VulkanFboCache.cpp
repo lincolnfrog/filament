@@ -24,6 +24,7 @@ namespace backend {
 bool VulkanFboCache::RenderPassEq::operator()(const RenderPassKey& k1,
         const RenderPassKey& k2) const {
     if (k1.flags.value != k2.flags.value) return false;
+    if (k1.subpassMask != k2.subpassMask) return false;
     if (k1.depthLayout != k2.depthLayout) return false;
     if (k1.depthFormat != k2.depthFormat) return false;
     for (int i = 0; i < MRT::TARGET_COUNT; i++) {
@@ -121,22 +122,39 @@ VkRenderPass VulkanFboCache::getRenderPass(RenderPassKey config) noexcept {
 
     const bool hasDepth = config.depthFormat != VK_FORMAT_UNDEFINED;
 
-    VkSubpassDescription subpass {
+    VkSubpassDescription subpasses[2] = {{
         .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
         .colorAttachmentCount = 0u,
         .pColorAttachments = colorAttachmentRef,
         .pDepthStencilAttachment = hasDepth ? &depthAttachmentRef : nullptr
-    };
+    },
+    {
+        .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+        .colorAttachmentCount = 0u,
+        .pColorAttachments = colorAttachmentRef,
+        .pDepthStencilAttachment = hasDepth ? &depthAttachmentRef : nullptr
+    }};
 
     VkAttachmentDescription attachments[MRT::TARGET_COUNT + 1] = {};
+
+    VkSubpassDependency dependencies[1] = {{
+        .srcSubpass = 0,
+        .dstSubpass = 1,
+        .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+        .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
+    }};
 
     VkRenderPassCreateInfo renderPassInfo {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
         .attachmentCount = 0u,
         .pAttachments = attachments,
-        .subpassCount = 1,
-        .pSubpasses = &subpass,
-        .dependencyCount = 0u
+        .subpassCount = config.subpassMask ? 2u : 1u,
+        .pSubpasses = subpasses,
+        .dependencyCount = config.subpassMask ? 1u : 0u,
+        .pDependencies = dependencies
     };
 
     int numAttachments = 0;
@@ -161,7 +179,8 @@ VkRenderPass VulkanFboCache::getRenderPass(RenderPassKey config) noexcept {
         };
         ++numAttachments;
     }
-    subpass.colorAttachmentCount = numAttachments;
+    subpasses[0].colorAttachmentCount = numAttachments;
+    subpasses[1].colorAttachmentCount = numAttachments;
 
     if (hasDepth) {
         bool clear = any(config.flags.clear & TargetBufferFlags::DEPTH);
