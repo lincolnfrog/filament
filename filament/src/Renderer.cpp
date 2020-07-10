@@ -706,10 +706,12 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
                             out.params.viewport.height);
                 }
 
-                driver.beginRenderPass(out.target, out.params);
-                pass.executeCommands(resources.getPassName());
-
                 if (colorGradingConfig.asSubpass) {
+                    out.params.subpassMask = 1 << 1;
+                    driver.beginRenderPass(out.target, out.params);
+                    pass.executeCommands(resources.getPassName());
+
+                    driver.beginSubpass();
                     ppm.colorGradingSubpass(driver,
                             view.getColorGrading(),
                             view.getVignetteOptions(),
@@ -718,6 +720,9 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
                             colorGradingConfig.dithering,
                             out.params.viewport.width,
                             out.params.viewport.height);
+                } else {
+                    driver.beginRenderPass(out.target, out.params);
+                    pass.executeCommands(resources.getPassName());
                 }
 
                 driver.endRenderPass();
